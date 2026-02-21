@@ -70,6 +70,7 @@ jobs:
           SQL_APP_NAME: MCP-SalesPOC-Sql
           PLAN_NAME: ASP-aimyaacoub-87dc
           RESOURCE_GROUP: ai-myaacoub
+          LOCATION: West US 2
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -79,10 +80,10 @@ jobs:
             throw 'RESOURCE_GROUP is not configured.'
           }
 
-          $location = az appservice plan show --name $env:PLAN_NAME --resource-group $resourceGroup --query location -o tsv
+          $location = $env:LOCATION
 
           if ([string]::IsNullOrWhiteSpace($location)) {
-            throw "Location could not be resolved from App Service Plan '$($env:PLAN_NAME)'."
+            throw 'LOCATION is not configured.'
           }
 
           $planExists = az appservice plan show --name $env:PLAN_NAME --resource-group $resourceGroup --query name -o tsv 2>$null
