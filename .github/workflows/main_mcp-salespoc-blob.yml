@@ -1,7 +1,7 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Build and deploy ASP.Net Core app to Azure Web App - MCP-SalesPOC-Blob
+name: Build and deploy .NET MCP servers to Azure App Service
 
 on:
   push:
@@ -23,17 +23,23 @@ jobs:
         with:
           dotnet-version: '10.x'
 
-      - name: Build with dotnet
-        run: dotnet build --configuration Release
+      - name: Restore
+        run: dotnet restore .\SalesPOC.MCP.sln
 
-      - name: dotnet publish
-        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+      - name: Publish Blob MCP Server
+        run: dotnet publish .\dotnet\BlobMcpServer\BlobMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\BlobMcpServer"
+
+      - name: Publish Cosmos MCP Server
+        run: dotnet publish .\dotnet\CosmosMcpServer\CosmosMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\CosmosMcpServer"
+
+      - name: Publish SQL MCP Server
+        run: dotnet publish .\dotnet\SqlMcpServer\SqlMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\SqlMcpServer"
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
-          name: .net-app
-          path: ${{env.DOTNET_ROOT}}/myapp
+          name: dotnet-mcp-servers
+          path: ${{ github.workspace }}\publish
 
   deploy:
     runs-on: windows-latest
@@ -46,7 +52,8 @@ jobs:
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
-          name: .net-app
+          name: dotnet-mcp-servers
+          path: .\publish
       
       - name: Login to Azure
         uses: azure/login@v2
@@ -55,11 +62,74 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4B2CB6F92E03448FA81C9752E6FD3556 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_1A02BF49454043DEAC0FAC98727B9FAA }}
 
-      - name: Deploy to Azure Web App
-        id: deploy-to-webapp
+      - name: Provision App Service Plans and Apps
+        shell: pwsh
+        env:
+          BLOB_APP_NAME: MCP-SalesPOC-Blob
+          COSMOS_APP_NAME: MCP-SalesPOC-Cosmos
+          SQL_APP_NAME: MCP-SalesPOC-Sql
+          PLAN_NAME: ASP-aimyaacoub-87dc
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $resourceGroup = az webapp show --name $env:BLOB_APP_NAME --query resourceGroup -o tsv
+
+          if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
+            throw 'Resource group could not be resolved from the existing Blob web app.'
+          }
+
+          $location = az webapp show --name $env:BLOB_APP_NAME --resource-group $resourceGroup --query location -o tsv
+
+          if ([string]::IsNullOrWhiteSpace($location)) {
+            throw 'Location could not be resolved from the existing Blob web app.'
+          }
+
+          $planExists = az appservice plan show --name $env:PLAN_NAME --resource-group $resourceGroup --query name -o tsv 2>$null
+          if (-not $planExists) {
+            throw "App Service Plan '$($env:PLAN_NAME)' was not found in resource group '$resourceGroup'."
+          }
+
+          function Ensure-WebApp {
+            param(
+              [Parameter(Mandatory = $true)] [string] $AppName,
+              [Parameter(Mandatory = $true)] [string] $PlanName
+            )
+
+            $planId = az appservice plan show --name $PlanName --resource-group $resourceGroup --query id -o tsv
+            $appExists = az webapp show --name $AppName --resource-group $resourceGroup --query name -o tsv 2>$null
+
+            if ($appExists) {
+              az webapp update --name $AppName --resource-group $resourceGroup --set serverFarmId=$planId | Out-Null
+            } else {
+              az webapp create --name $AppName --resource-group $resourceGroup --plan $PlanName | Out-Null
+            }
+          }
+
+          Ensure-WebApp -AppName $env:BLOB_APP_NAME -PlanName $env:PLAN_NAME
+          Ensure-WebApp -AppName $env:COSMOS_APP_NAME -PlanName $env:PLAN_NAME
+          Ensure-WebApp -AppName $env:SQL_APP_NAME -PlanName $env:PLAN_NAME
+
+      - name: Deploy Blob MCP Server
+        id: deploy-blob
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'MCP-SalesPOC-Blob'
           slot-name: 'Production'
-          package: .
+          package: .\publish\BlobMcpServer
+
+      - name: Deploy Cosmos MCP Server
+        id: deploy-cosmos
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'MCP-SalesPOC-Cosmos'
+          slot-name: 'Production'
+          package: .\publish\CosmosMcpServer
+
+      - name: Deploy SQL MCP Server
+        id: deploy-sql
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'MCP-SalesPOC-Sql'
+          slot-name: 'Production'
+          package: .\publish\SqlMcpServer
           
