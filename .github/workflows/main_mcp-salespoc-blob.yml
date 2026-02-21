@@ -68,27 +68,32 @@ jobs:
           BLOB_APP_NAME: MCP-SalesPOC-Blob
           COSMOS_APP_NAME: MCP-SalesPOC-Cosmos
           SQL_APP_NAME: MCP-SalesPOC-Sql
-          PLAN_NAME: ASP-aimyaacoub-87dc
-          RESOURCE_GROUP: ai-myaacoub
-          LOCATION: West US 2
+          PLAN_RESOURCE_ID: /subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Web/serverFarms/ASP-aimyaacoub-87dc
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $resourceGroup = $env:RESOURCE_GROUP
+          if ([string]::IsNullOrWhiteSpace($env:PLAN_RESOURCE_ID)) {
+            throw 'PLAN_RESOURCE_ID is not configured.'
+          }
+
+          $planResourceId = $env:PLAN_RESOURCE_ID
+          $subscriptionId = ($planResourceId -split '/')[2]
+          if ([string]::IsNullOrWhiteSpace($subscriptionId)) {
+            throw "Could not parse subscription id from PLAN_RESOURCE_ID: $planResourceId"
+          }
+
+          az account set --subscription $subscriptionId | Out-Null
+
+          $plan = az appservice plan show --ids $planResourceId -o json | ConvertFrom-Json
+          if ($null -eq $plan -or [string]::IsNullOrWhiteSpace($plan.id)) {
+            throw "App Service Plan not found by id: $planResourceId"
+          }
+
+          $planName = $plan.name
+          $resourceGroup = $plan.resourceGroup
 
           if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
-            throw 'RESOURCE_GROUP is not configured.'
-          }
-
-          $location = $env:LOCATION
-
-          if ([string]::IsNullOrWhiteSpace($location)) {
-            throw 'LOCATION is not configured.'
-          }
-
-          $planExists = az appservice plan show --name $env:PLAN_NAME --resource-group $resourceGroup --query name -o tsv 2>$null
-          if (-not $planExists) {
-            throw "App Service Plan '$($env:PLAN_NAME)' was not found in resource group '$resourceGroup'."
+            throw "Resource group could not be resolved from plan id: $planResourceId"
           }
 
           function Ensure-WebApp {
@@ -107,9 +112,9 @@ jobs:
             }
           }
 
-          Ensure-WebApp -AppName $env:BLOB_APP_NAME -PlanName $env:PLAN_NAME
-          Ensure-WebApp -AppName $env:COSMOS_APP_NAME -PlanName $env:PLAN_NAME
-          Ensure-WebApp -AppName $env:SQL_APP_NAME -PlanName $env:PLAN_NAME
+          Ensure-WebApp -AppName $env:BLOB_APP_NAME -PlanName $planName
+          Ensure-WebApp -AppName $env:COSMOS_APP_NAME -PlanName $planName
+          Ensure-WebApp -AppName $env:SQL_APP_NAME -PlanName $planName
 
       - name: Deploy Blob MCP Server
         id: deploy-blob
