@@ -69,13 +69,14 @@ jobs:
           COSMOS_APP_NAME: MCP-SalesPOC-Cosmos
           SQL_APP_NAME: MCP-SalesPOC-Sql
           PLAN_NAME: ASP-aimyaacoub-87dc
+          RESOURCE_GROUP: ai-myaacoub
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $resourceGroup = az appservice plan list --query "[?name=='$($env:PLAN_NAME)'] | [0].resourceGroup" -o tsv
+          $resourceGroup = $env:RESOURCE_GROUP
 
           if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
-            throw "Resource group could not be resolved from App Service Plan '$($env:PLAN_NAME)'."
+            throw 'RESOURCE_GROUP is not configured.'
           }
 
           $location = az appservice plan show --name $env:PLAN_NAME --resource-group $resourceGroup --query location -o tsv
