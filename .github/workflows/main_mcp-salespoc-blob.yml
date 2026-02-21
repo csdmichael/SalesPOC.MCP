@@ -62,59 +62,35 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4B2CB6F92E03448FA81C9752E6FD3556 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_1A02BF49454043DEAC0FAC98727B9FAA }}
 
-      - name: Provision App Service Plans and Apps
+      - name: Validate target Web Apps
         shell: pwsh
         env:
           BLOB_APP_NAME: MCP-SalesPOC-Blob
           COSMOS_APP_NAME: MCP-SalesPOC-Cosmos
           SQL_APP_NAME: MCP-SalesPOC-Sql
-          PLAN_RESOURCE_ID: /subscriptions/86b37969-9445-49cf-b03f-d8866235171c/resourceGroups/ai-myaacoub/providers/Microsoft.Web/serverFarms/ASP-aimyaacoub-87dc
+          RESOURCE_GROUP: ai-myaacoub
         run: |
           $ErrorActionPreference = 'Stop'
 
-          if ([string]::IsNullOrWhiteSpace($env:PLAN_RESOURCE_ID)) {
-            throw 'PLAN_RESOURCE_ID is not configured.'
+          if ([string]::IsNullOrWhiteSpace($env:RESOURCE_GROUP)) {
+            throw 'RESOURCE_GROUP is not configured.'
           }
 
-          $planResourceId = $env:PLAN_RESOURCE_ID
-          $subscriptionId = ($planResourceId -split '/')[2]
-          if ([string]::IsNullOrWhiteSpace($subscriptionId)) {
-            throw "Could not parse subscription id from PLAN_RESOURCE_ID: $planResourceId"
-          }
+          $resourceGroup = $env:RESOURCE_GROUP
+          $missingApps = New-Object System.Collections.Generic.List[string]
+          $apps = @($env:BLOB_APP_NAME, $env:COSMOS_APP_NAME, $env:SQL_APP_NAME)
 
-          az account set --subscription $subscriptionId | Out-Null
-
-          $plan = az appservice plan show --ids $planResourceId -o json | ConvertFrom-Json
-          if ($null -eq $plan -or [string]::IsNullOrWhiteSpace($plan.id)) {
-            throw "App Service Plan not found by id: $planResourceId"
-          }
-
-          $planName = $plan.name
-          $resourceGroup = $plan.resourceGroup
-
-          if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
-            throw "Resource group could not be resolved from plan id: $planResourceId"
-          }
-
-          function Ensure-WebApp {
-            param(
-              [Parameter(Mandatory = $true)] [string] $AppName,
-              [Parameter(Mandatory = $true)] [string] $PlanName
-            )
-
-            $planId = az appservice plan show --name $PlanName --resource-group $resourceGroup --query id -o tsv
-            $appExists = az webapp show --name $AppName --resource-group $resourceGroup --query name -o tsv 2>$null
-
-            if ($appExists) {
-              az webapp update --name $AppName --resource-group $resourceGroup --set serverFarmId=$planId | Out-Null
-            } else {
-              az webapp create --name $AppName --resource-group $resourceGroup --plan $PlanName | Out-Null
+          foreach ($app in $apps) {
+            $exists = az webapp show --name $app --resource-group $resourceGroup --query name -o tsv 2>$null
+            if ([string]::IsNullOrWhiteSpace($exists)) {
+              $missingApps.Add($app)
             }
           }
 
-          Ensure-WebApp -AppName $env:BLOB_APP_NAME -PlanName $planName
-          Ensure-WebApp -AppName $env:COSMOS_APP_NAME -PlanName $planName
-          Ensure-WebApp -AppName $env:SQL_APP_NAME -PlanName $planName
+          if ($missingApps.Count -gt 0) {
+            $list = $missingApps -join ', '
+            throw "Missing Web App(s) in resource group '$resourceGroup': $list. Create them manually or grant permissions to provision them."
+          }
 
       - name: Deploy Blob MCP Server
         id: deploy-blob
