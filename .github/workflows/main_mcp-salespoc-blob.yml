@@ -27,13 +27,13 @@ jobs:
         run: dotnet restore .\SalesPOC.MCP.sln
 
       - name: Publish Blob MCP Server
-        run: dotnet publish .\dotnet\BlobMcpServer\BlobMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\BlobMcpServer"
+        run: dotnet publish .\dotnet\BlobMcpServer\BlobMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\BlobMcpServer" -p:SelfContained=false -p:PublishSelfContained=false -p:PublishSingleFile=false
 
       - name: Publish Cosmos MCP Server
-        run: dotnet publish .\dotnet\CosmosMcpServer\CosmosMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\CosmosMcpServer"
+        run: dotnet publish .\dotnet\CosmosMcpServer\CosmosMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\CosmosMcpServer" -p:SelfContained=false -p:PublishSelfContained=false -p:PublishSingleFile=false
 
       - name: Publish SQL MCP Server
-        run: dotnet publish .\dotnet\SqlMcpServer\SqlMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\SqlMcpServer"
+        run: dotnet publish .\dotnet\SqlMcpServer\SqlMcpServer.csproj -c Release -o "${{ github.workspace }}\publish\SqlMcpServer" -p:SelfContained=false -p:PublishSelfContained=false -p:PublishSingleFile=false
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4

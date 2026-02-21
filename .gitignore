@@ -56,3 +56,7 @@ node_modules/
 __pycache__/
 .venv/
 *.pyc
+
+## Local publish debug output
+_tmp_publish_sql/
+_tmp_publish_sql_fd/
