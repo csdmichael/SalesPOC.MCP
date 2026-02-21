@@ -62,36 +62,6 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4B2CB6F92E03448FA81C9752E6FD3556 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_1A02BF49454043DEAC0FAC98727B9FAA }}
 
-      - name: Validate target Web Apps
-        shell: pwsh
-        env:
-          BLOB_APP_NAME: MCP-SalesPOC-Blob
-          COSMOS_APP_NAME: MCP-SalesPOC-Cosmos
-          SQL_APP_NAME: MCP-SalesPOC-Sql
-          RESOURCE_GROUP: ai-myaacoub
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          if ([string]::IsNullOrWhiteSpace($env:RESOURCE_GROUP)) {
-            throw 'RESOURCE_GROUP is not configured.'
-          }
-
-          $resourceGroup = $env:RESOURCE_GROUP
-          $missingApps = New-Object System.Collections.Generic.List[string]
-          $apps = @($env:BLOB_APP_NAME, $env:COSMOS_APP_NAME, $env:SQL_APP_NAME)
-
-          foreach ($app in $apps) {
-            $exists = az webapp show --name $app --resource-group $resourceGroup --query name -o tsv 2>$null
-            if ([string]::IsNullOrWhiteSpace($exists)) {
-              $missingApps.Add($app)
-            }
-          }
-
-          if ($missingApps.Count -gt 0) {
-            $list = $missingApps -join ', '
-            throw "Missing Web App(s) in resource group '$resourceGroup': $list. Create them manually or grant permissions to provision them."
-          }
-
       - name: Deploy Blob MCP Server
         id: deploy-blob
         uses: azure/webapps-deploy@v3
