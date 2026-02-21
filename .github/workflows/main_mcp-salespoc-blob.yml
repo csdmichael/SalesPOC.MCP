@@ -72,16 +72,16 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $resourceGroup = az webapp show --name $env:BLOB_APP_NAME --query resourceGroup -o tsv
+          $resourceGroup = az appservice plan list --query "[?name=='$($env:PLAN_NAME)'] | [0].resourceGroup" -o tsv
 
           if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
-            throw 'Resource group could not be resolved from the existing Blob web app.'
+            throw "Resource group could not be resolved from App Service Plan '$($env:PLAN_NAME)'."
           }
 
-          $location = az webapp show --name $env:BLOB_APP_NAME --resource-group $resourceGroup --query location -o tsv
+          $location = az appservice plan show --name $env:PLAN_NAME --resource-group $resourceGroup --query location -o tsv
 
           if ([string]::IsNullOrWhiteSpace($location)) {
-            throw 'Location could not be resolved from the existing Blob web app.'
+            throw "Location could not be resolved from App Service Plan '$($env:PLAN_NAME)'."
           }
 
           $planExists = az appservice plan show --name $env:PLAN_NAME --resource-group $resourceGroup --query name -o tsv 2>$null

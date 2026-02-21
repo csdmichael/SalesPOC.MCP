@@ -53,6 +53,16 @@ Default local MCP endpoints:
 - Blob: `http://localhost:6128`
 - SQL: `http://localhost:6275`
 
+### Test URLs (.NET MCP)
+
+Use these URLs in your MCP client (HTTP transport) to test the deployed servers:
+
+- Blob MCP: `https://mcp-salespoc-blob.azurewebsites.net`
+- Cosmos MCP: `https://mcp-salespoc-cosmos.azurewebsites.net`
+- SQL MCP: `https://mcp-salespoc-sql.azurewebsites.net`
+
+If your MCP client requires a route path, append the configured MCP path (for example `/mcp` if configured in your client/server setup).
+
 ---
 
 ## Python MCP Servers
