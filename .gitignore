@@ -1,0 +1,58 @@
+## .NET / Visual Studio
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Rr]elease/
+[Dd]ebug/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.nupkg
+*.snupkg
+*.nuspec
+artifacts/
+*.cache
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+.vs/
+
+## Rider / VS Code
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+## ASP.NET / tooling
+*.dbmdl
+*.jfm
+*.publishsettings
+*.pidb
+*.svclog
+*.scc
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## Node
+node_modules/
+
+## Python
+.env
+__pycache__/
+.venv/
+*.pyc
