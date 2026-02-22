@@ -101,4 +101,42 @@ internal class BlobTools
             };
         }
     }
+
+    [McpServerTool]
+    [Description("Download one blob document as a base64 payload with metadata.")]
+    public object DownloadDocument(
+        [Description("Blob name to download.")] string blobName,
+        [Description("Maximum base64 characters to return.")] int maxChars = 5_000_000)
+    {
+        if (string.IsNullOrWhiteSpace(blobName))
+        {
+            throw new ArgumentException("'blobName' is required.", nameof(blobName));
+        }
+
+        var safeMax = Math.Clamp(maxChars, 10_000, 20_000_000);
+        var trimmedName = blobName.Trim();
+
+        var container = GetContainerClient();
+        var blob = container.GetBlobClient(trimmedName);
+
+        using var stream = new MemoryStream();
+        blob.DownloadTo(stream);
+        var data = stream.ToArray();
+
+        var properties = blob.GetProperties();
+        var contentType = properties.Value.ContentType;
+        var base64 = Convert.ToBase64String(data);
+        var fileName = Path.GetFileName(trimmedName);
+
+        return new
+        {
+            blob_name = trimmedName,
+            file_name = string.IsNullOrWhiteSpace(fileName) ? trimmedName : fileName,
+            content_type = contentType,
+            encoding = "base64",
+            truncated = base64.Length > safeMax,
+            content = base64[..Math.Min(base64.Length, safeMax)],
+            size_bytes = data.Length
+        };
+    }
 }

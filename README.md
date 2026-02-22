@@ -31,10 +31,12 @@ The .NET implementation is under `dotnet/` and exposes HTTP MCP endpoints.
   - Tools:
     - `FindProducts(searchText?, category?, minPrice?, maxPrice?, limit?)`
     - `GetProductById(id)`
+    - `DownloadProducts(searchText?, category?, minPrice?, maxPrice?, limit?, maxChars?)`
 - `dotnet/BlobMcpServer`
   - Tools:
     - `ListDocuments(prefix?, limit?)`
     - `ReadDocument(blobName, maxChars?)`
+    - `DownloadDocument(blobName, maxChars?)`
 - `dotnet/SqlMcpServer`
   - Tools:
     - `ListTables(schema?, limit?)`
@@ -58,6 +60,12 @@ The .NET implementation is under `dotnet/` and exposes HTTP MCP endpoints.
   - Use for: exact product lookup by id
   - Inputs: `id` required, trimmed
   - Output shape: full product object or `null`
+- `DownloadProducts(searchText?, category?, minPrice?, maxPrice?, limit?, maxChars?)`
+  - Use for: export product search result as a downloadable JSON document payload
+  - Inputs:
+    - same filters as `FindProducts`
+    - `maxChars`: max returned base64 chars (payload is base64 encoded JSON)
+  - Output shape: `{ file_name, content_type, encoding, truncated, content, size_bytes, count }`
 
 #### Blob MCP (`dotnet/BlobMcpServer`)
 
@@ -76,6 +84,12 @@ The .NET implementation is under `dotnet/` and exposes HTTP MCP endpoints.
   - Behavior:
     - returns UTF-8 text when decodable
     - otherwise returns Base64
+- `DownloadDocument(blobName, maxChars?)`
+  - Use for: download full blob as base64 payload (suitable for binary documents)
+  - Inputs:
+    - `blobName`: required exact blob path/name
+    - `maxChars`: max returned base64 chars
+  - Output shape: `{ blob_name, file_name, content_type, encoding, truncated, content, size_bytes }`
 
 #### SQL MCP (`dotnet/SqlMcpServer`)
 
