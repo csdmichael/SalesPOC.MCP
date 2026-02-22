@@ -38,6 +38,8 @@ The .NET implementation is under `dotnet/` and exposes HTTP MCP endpoints.
 - `dotnet/SqlMcpServer`
   - Tools:
     - `ListTables(schema?, limit?)`
+    - `ListTableColumns(table, schema?)`
+    - `QueryTableRows(table, filters?, schema?, orderBy?, descending?, maxRows?)`
     - `QueryData(sql, maxRows?)` (read-only `SELECT`/`WITH` only)
 
 ### .NET Tool Reference (for agents)
@@ -83,6 +85,25 @@ The .NET implementation is under `dotnet/` and exposes HTTP MCP endpoints.
     - `schema`: default `dbo`
     - `limit`: clamped to `1..1000`
   - Output shape: `{ count, items[] }` where each item is `{ schema, table }`
+- `ListTableColumns(table, schema?)`
+  - Use for: discover valid columns to build safe filter queries
+  - Inputs:
+    - `table`: required table name
+    - `schema`: default `dbo`
+  - Output shape: `{ schema, table, count, columns[] }`
+- `QueryTableRows(table, filters?, schema?, orderBy?, descending?, maxRows?)`
+  - Use for: agent-safe row retrieval from any table using equality filters
+  - Inputs:
+    - `table`: required table name
+    - `filters`: optional object of `{ columnName: value }` equality filters
+    - `schema`: default `dbo`
+    - `orderBy`: optional sort column
+    - `descending`: sort direction toggle
+    - `maxRows`: clamped to `1..2000`
+  - Output shape: `{ schema, table, count, columns[], truncated, items[] }`
+  - Safety constraints:
+    - schema/table/columns must be valid identifiers
+    - filters and `orderBy` must reference real columns in the target table
 - `QueryData(sql, maxRows?)`
   - Use for: read-only analytical/data retrieval queries
   - Inputs:

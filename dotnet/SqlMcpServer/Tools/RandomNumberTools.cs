@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using ModelContextProtocol.Server;
 
@@ -30,6 +31,62 @@ internal class SqlTools
         }
 
         return new SqlConnection(connectionString);
+    }
+
+    private static bool IsValidIdentifier(string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return false;
+        }
+
+        if (!(char.IsLetter(identifier[0]) || identifier[0] == '_'))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < identifier.Length; i++)
+        {
+            var ch = identifier[i];
+            if (!(char.IsLetterOrDigit(ch) || ch == '_'))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string QuoteIdentifier(string identifier)
+    {
+        return $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";
+    }
+
+    private static object? NormalizeFilterValue(object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (value is JsonElement json)
+        {
+            return json.ValueKind switch
+            {
+                JsonValueKind.String => json.GetString(),
+                JsonValueKind.Number => json.TryGetInt64(out var intVal)
+                    ? intVal
+                    : json.TryGetDouble(out var dblVal)
+                        ? dblVal
+                        : json.GetRawText(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => null,
+                _ => throw new InvalidOperationException("Filter values must be scalar (string, number, bool, or null).")
+            };
+        }
+
+        return value;
     }
 
     private static string ValidateReadOnlySql(string sql)
@@ -143,6 +200,169 @@ internal class SqlTools
 
         return new
         {
+            count = items.Count,
+            columns,
+            truncated = items.Count == safeRows,
+            items
+        };
+    }
+
+    [McpServerTool]
+    [Description("List columns for a table so agents can build safe filters.")]
+    public async Task<object> ListTableColumns(
+        [Description("Database table name.")] string table,
+        [Description("Database schema name.")] string schema = "dbo")
+    {
+        var tableName = (table ?? string.Empty).Trim();
+        var schemaName = (schema ?? "dbo").Trim();
+
+        if (!IsValidIdentifier(tableName) || !IsValidIdentifier(schemaName))
+        {
+            throw new InvalidOperationException("Invalid schema or table identifier.");
+        }
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync().ConfigureAwait(false);
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT c.name
+            FROM sys.columns c
+            INNER JOIN sys.tables t ON c.object_id = t.object_id
+            INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE s.name = @schema AND t.name = @table
+            ORDER BY c.column_id";
+        cmd.Parameters.Add(new SqlParameter("@schema", schemaName));
+        cmd.Parameters.Add(new SqlParameter("@table", tableName));
+
+        var columns = new List<string>();
+        await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            columns.Add(reader.GetString(0));
+        }
+
+        return new
+        {
+            schema = schemaName,
+            table = tableName,
+            count = columns.Count,
+            columns
+        };
+    }
+
+    [McpServerTool]
+    [Description("Query any table with optional equality filters. Use ListTableColumns first to discover valid columns.")]
+    public async Task<object> QueryTableRows(
+        [Description("Database table name.")] string table,
+        [Description("Optional equality filters as column:value pairs.")] Dictionary<string, object?>? filters = null,
+        [Description("Database schema name.")] string schema = "dbo",
+        [Description("Optional column to sort by.")] string? orderBy = null,
+        [Description("Sort descending when true.")] bool descending = false,
+        [Description("Maximum number of rows to return.")] int maxRows = 200)
+    {
+        var tableName = (table ?? string.Empty).Trim();
+        var schemaName = (schema ?? "dbo").Trim();
+        var safeRows = Math.Clamp(maxRows, 1, 2000);
+
+        if (!IsValidIdentifier(tableName) || !IsValidIdentifier(schemaName))
+        {
+            throw new InvalidOperationException("Invalid schema or table identifier.");
+        }
+
+        await using var conn = GetConnection();
+        await conn.OpenAsync().ConfigureAwait(false);
+
+        var validColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using (var colsCmd = conn.CreateCommand())
+        {
+            colsCmd.CommandText = @"
+                SELECT c.name
+                FROM sys.columns c
+                INNER JOIN sys.tables t ON c.object_id = t.object_id
+                INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+                WHERE s.name = @schema AND t.name = @table";
+            colsCmd.Parameters.Add(new SqlParameter("@schema", schemaName));
+            colsCmd.Parameters.Add(new SqlParameter("@table", tableName));
+
+            await using var reader = await colsCmd.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                validColumns.Add(reader.GetString(0));
+            }
+        }
+
+        if (validColumns.Count == 0)
+        {
+            throw new InvalidOperationException($"Table '{schemaName}.{tableName}' was not found.");
+        }
+
+        var whereClauses = new List<string>();
+        await using var cmd = conn.CreateCommand();
+        cmd.Parameters.Add(new SqlParameter("@maxRows", safeRows));
+
+        if (filters is not null)
+        {
+            var paramIndex = 0;
+            foreach (var entry in filters)
+            {
+                var column = (entry.Key ?? string.Empty).Trim();
+                if (!IsValidIdentifier(column) || !validColumns.Contains(column))
+                {
+                    throw new InvalidOperationException($"Invalid filter column: {column}");
+                }
+
+                var value = NormalizeFilterValue(entry.Value);
+                if (value is null)
+                {
+                    whereClauses.Add($"{QuoteIdentifier(column)} IS NULL");
+                    continue;
+                }
+
+                var paramName = $"@f{paramIndex++}";
+                whereClauses.Add($"{QuoteIdentifier(column)} = {paramName}");
+                cmd.Parameters.Add(new SqlParameter(paramName, value));
+            }
+        }
+
+        string? orderByClause = null;
+        if (!string.IsNullOrWhiteSpace(orderBy))
+        {
+            var orderByColumn = orderBy.Trim();
+            if (!IsValidIdentifier(orderByColumn) || !validColumns.Contains(orderByColumn))
+            {
+                throw new InvalidOperationException($"Invalid orderBy column: {orderByColumn}");
+            }
+
+            orderByClause = $" ORDER BY {QuoteIdentifier(orderByColumn)} {(descending ? "DESC" : "ASC")}";
+        }
+
+        var whereSql = whereClauses.Count == 0 ? string.Empty : $" WHERE {string.Join(" AND ", whereClauses)}";
+        cmd.CommandText =
+            $"SELECT TOP (@maxRows) * FROM {QuoteIdentifier(schemaName)}.{QuoteIdentifier(tableName)}{whereSql}{orderByClause}";
+
+        var items = new List<Dictionary<string, object?>>();
+        await using var resultReader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+        var columns = Enumerable.Range(0, resultReader.FieldCount)
+            .Select(resultReader.GetName)
+            .ToList();
+
+        while (items.Count < safeRows && await resultReader.ReadAsync().ConfigureAwait(false))
+        {
+            var row = new Dictionary<string, object?>();
+            for (var i = 0; i < resultReader.FieldCount; i++)
+            {
+                var value = resultReader.IsDBNull(i) ? null : resultReader.GetValue(i);
+                row[resultReader.GetName(i)] = value;
+            }
+
+            items.Add(row);
+        }
+
+        return new
+        {
+            schema = schemaName,
+            table = tableName,
             count = items.Count,
             columns,
             truncated = items.Count == safeRows,
