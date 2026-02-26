@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "SqlMcpServer": {
+      "type": "http",
+      "url": "https://mcp-salespoc-sql.azurewebsites.net"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "CosmosMcpServer": {
+      "type": "http",
+      "url": "https://mcp-salespoc-cosmos.azurewebsites.net"
+    }
+  }
+}
