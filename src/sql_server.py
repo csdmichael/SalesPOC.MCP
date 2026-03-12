@@ -11,8 +11,47 @@ connection_string = os.getenv("SQL_CONNECTION_STRING")
 host = os.getenv("MCP_HOST", "127.0.0.1")
 port = int(os.getenv("MCP_PORT", os.getenv("PORT", os.getenv("WEBSITES_PORT", "8000"))))
 
+
+def _normalize_sql_connection_string(raw_connection_string: str) -> str:
+    blocked_keys = {"uid", "user id", "user", "pwd", "password"}
+    normalized_parts = []
+    has_authentication = False
+
+    for part in raw_connection_string.split(";"):
+        segment = part.strip()
+        if not segment:
+            continue
+
+        if "=" not in segment:
+            normalized_parts.append(segment)
+            continue
+
+        key, value = segment.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        lowered_key = key.lower()
+
+        if lowered_key in blocked_keys:
+            raise RuntimeError(
+                "SQL_CONNECTION_STRING must not include SQL username/password. "
+                "Use Microsoft Entra auth with Authentication=Active Directory Default."
+            )
+
+        if lowered_key == "authentication":
+            has_authentication = True
+            normalized_parts.append(f"{key}=Active Directory Default")
+        else:
+            normalized_parts.append(f"{key}={value}")
+
+    if not has_authentication:
+        normalized_parts.append("Authentication=Active Directory Default")
+
+    return ";".join(normalized_parts) + ";"
+
 if not connection_string:
     raise RuntimeError("Missing SQL_CONNECTION_STRING environment variable.")
+
+connection_string = _normalize_sql_connection_string(connection_string)
 
 mcp = FastMCP("sql_server", host=host, port=port)
 

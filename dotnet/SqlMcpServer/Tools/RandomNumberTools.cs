@@ -24,13 +24,32 @@ internal class SqlTools
 
     private static SqlConnection GetConnection()
     {
-        var connectionString = Environment.GetEnvironmentVariable("SQL_CONNECTION_STRING");
-        if (string.IsNullOrWhiteSpace(connectionString))
+        var rawConnectionString = Environment.GetEnvironmentVariable("SQL_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(rawConnectionString))
         {
             throw new InvalidOperationException("Missing SQL_CONNECTION_STRING environment variable.");
         }
 
-        return new SqlConnection(connectionString);
+        SqlConnectionStringBuilder builder;
+        try
+        {
+            builder = new SqlConnectionStringBuilder(rawConnectionString);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidOperationException("SQL_CONNECTION_STRING is invalid.", ex);
+        }
+
+        if (!string.IsNullOrWhiteSpace(builder.UserID) || !string.IsNullOrWhiteSpace(builder.Password))
+        {
+            throw new InvalidOperationException(
+                "SQL_CONNECTION_STRING must not include SQL username/password. " +
+                "Use Microsoft Entra auth with Authentication=Active Directory Default.");
+        }
+
+        builder.Authentication = SqlAuthenticationMethod.ActiveDirectoryDefault;
+
+        return new SqlConnection(builder.ConnectionString);
     }
 
     private static bool IsValidIdentifier(string identifier)

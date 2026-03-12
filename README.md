@@ -255,7 +255,7 @@ Policy environment variables:
    $env:COSMOS_CONTAINER_NAME="products"
    $env:AZURE_BLOB_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=aistoragemyaacoub;AccountKey=<your-key>;EndpointSuffix=core.windows.net"
    $env:AZURE_BLOB_CONTAINER_NAME="semiconductor-product-documents"
-   $env:SQL_CONNECTION_STRING="Driver={ODBC Driver 18 for SQL Server};Server=tcp:ai-db-poc.database.windows.net,1433;Database=ai-db-poc;Uid=dbadmin;Pwd=<your-password>;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+  $env:SQL_CONNECTION_STRING="Driver={ODBC Driver 18 for SQL Server};Server=tcp:ai-db-poc.database.windows.net,1433;Database=ai-db-poc;Authentication=Active Directory Default;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
    $env:POLICY_MAX_OUTPUT_CHARS="12000"
    $env:POLICY_RATE_LIMIT_PER_MINUTE="60"
    ```
