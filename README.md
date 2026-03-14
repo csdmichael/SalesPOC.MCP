@@ -267,3 +267,9 @@ python src/cosmos_server.py
 python src/blob_server.py
 python src/sql_server.py
 ```
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
