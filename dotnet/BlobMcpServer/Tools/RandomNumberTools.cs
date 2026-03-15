@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text;
+using Azure.Identity;
 using Azure.Storage.Blobs;
 using ModelContextProtocol.Server;
 
@@ -7,15 +8,15 @@ internal class BlobTools
 {
     private static BlobContainerClient GetContainerClient()
     {
-        var connectionString = Environment.GetEnvironmentVariable("AZURE_BLOB_CONNECTION_STRING");
+        var accountUrl = Environment.GetEnvironmentVariable("AZURE_BLOB_ACCOUNT_URL");
         var containerName = Environment.GetEnvironmentVariable("AZURE_BLOB_CONTAINER_NAME") ?? "semiconductor-product-documents";
 
-        if (string.IsNullOrWhiteSpace(connectionString))
+        if (string.IsNullOrWhiteSpace(accountUrl))
         {
-            throw new InvalidOperationException("Missing AZURE_BLOB_CONNECTION_STRING environment variable.");
+            throw new InvalidOperationException("Missing AZURE_BLOB_ACCOUNT_URL environment variable.");
         }
 
-        var service = new BlobServiceClient(connectionString);
+        var service = new BlobServiceClient(new Uri(accountUrl), new DefaultAzureCredential());
         return service.GetBlobContainerClient(containerName);
     }
 

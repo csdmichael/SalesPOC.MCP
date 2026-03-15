@@ -3,25 +3,28 @@ from functools import lru_cache
 from typing import Any
 
 from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
 from mcp.server.fastmcp import FastMCP
 
 from policies import enforce_output_policy, enforce_rate_limit, enforce_text_policy
 
-connection_string = os.getenv("COSMOS_CONNECTION_STRING")
+endpoint = os.getenv("COSMOS_ENDPOINT")
 database_name = os.getenv("COSMOS_DATABASE_NAME", "sales")
 container_name = os.getenv("COSMOS_CONTAINER_NAME", "products")
 host = os.getenv("MCP_HOST", "127.0.0.1")
 port = int(os.getenv("MCP_PORT", os.getenv("PORT", os.getenv("WEBSITES_PORT", "8000"))))
 
-if not connection_string:
-    raise RuntimeError("Missing COSMOS_CONNECTION_STRING environment variable.")
+if not endpoint:
+    raise RuntimeError("Missing COSMOS_ENDPOINT environment variable.")
+
+credential = DefaultAzureCredential()
 
 mcp = FastMCP("cosmos_server", host=host, port=port)
 
 
 @lru_cache(maxsize=1)
 def get_container():
-    client = CosmosClient.from_connection_string(connection_string)
+    client = CosmosClient(endpoint, credential=credential)
     return client.get_database_client(database_name).get_container_client(container_name)
 
 

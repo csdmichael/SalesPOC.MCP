@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
+using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using ModelContextProtocol.Server;
 
@@ -8,16 +9,16 @@ internal class CosmosTools
 {
     private static Microsoft.Azure.Cosmos.Container GetContainer()
     {
-        var connectionString = Environment.GetEnvironmentVariable("COSMOS_CONNECTION_STRING");
+        var endpoint = Environment.GetEnvironmentVariable("COSMOS_ENDPOINT");
         var databaseName = Environment.GetEnvironmentVariable("COSMOS_DATABASE_NAME") ?? "sales";
         var containerName = Environment.GetEnvironmentVariable("COSMOS_CONTAINER_NAME") ?? "products";
 
-        if (string.IsNullOrWhiteSpace(connectionString))
+        if (string.IsNullOrWhiteSpace(endpoint))
         {
-            throw new InvalidOperationException("Missing COSMOS_CONNECTION_STRING environment variable.");
+            throw new InvalidOperationException("Missing COSMOS_ENDPOINT environment variable.");
         }
 
-        var client = new CosmosClient(connectionString);
+        var client = new CosmosClient(endpoint, new DefaultAzureCredential());
         return client.GetContainer(databaseName, containerName);
     }
 
