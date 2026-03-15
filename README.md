@@ -128,14 +128,18 @@ The .NET implementation is under `dotnet/` and exposes HTTP MCP endpoints.
     - blocks write/DDL/DCL keywords (`insert`, `update`, `delete`, `drop`, `alter`, etc.)
     - rejects multi-statement SQL
 
+### Authentication
+
+All .NET servers authenticate to Azure services using `DefaultAzureCredential` (managed identity, Azure CLI, environment credentials, etc.). Connection strings with embedded keys or passwords are **not** supported. For SQL, the connection string must use `Authentication=Active Directory Default` and must **not** include a username or password.
+
 ### Required environment variables
 
-- `COSMOS_CONNECTION_STRING`
+- `COSMOS_ENDPOINT` — Cosmos DB account endpoint URL (e.g. `https://<account>.privatelink.documents.azure.com:443/`)
 - `COSMOS_DATABASE_NAME` (optional, default: `sales`)
 - `COSMOS_CONTAINER_NAME` (optional, default: `products`)
-- `AZURE_BLOB_CONNECTION_STRING`
+- `AZURE_BLOB_ACCOUNT_URL` — Blob storage account URL (e.g. `https://<account>.privatelink.blob.core.windows.net`)
 - `AZURE_BLOB_CONTAINER_NAME` (optional, default: `semiconductor-product-documents`)
-- `SQL_CONNECTION_STRING`
+- `SQL_CONNECTION_STRING` — must use `Authentication=Active Directory Default`; username/password not allowed
 
 ### Run (.NET)
 
@@ -198,6 +202,8 @@ Python tools are semantically aligned to .NET, with snake_case names:
 Python-specific behavior important for agents:
 
 - Transport can run as `stdio`, `sse`, or `streamable-http` via `MCP_TRANSPORT`
+- Cosmos and Blob authenticate using `DefaultAzureCredential` (managed identity, Azure CLI, etc.)
+- SQL uses `Active Directory Default` authentication via `SQL_CONNECTION_STRING`; username/password is rejected
 - Shared protections from `src/policies.py` enforce:
   - rate limiting
   - prompt-content checks
@@ -250,12 +256,12 @@ Policy environment variables:
    ```
 3. Set environment variables (PowerShell):
    ```powershell
-   $env:COSMOS_CONNECTION_STRING="AccountEndpoint=https://cosmos-ai-poc.documents.azure.com:443/;AccountKey=<your-key>"
+   $env:COSMOS_ENDPOINT="https://<your-account>.privatelink.documents.azure.com:443/"
    $env:COSMOS_DATABASE_NAME="sales"
    $env:COSMOS_CONTAINER_NAME="products"
-   $env:AZURE_BLOB_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=aistoragemyaacoub;AccountKey=<your-key>;EndpointSuffix=core.windows.net"
+   $env:AZURE_BLOB_ACCOUNT_URL="https://<your-account>.privatelink.blob.core.windows.net"
    $env:AZURE_BLOB_CONTAINER_NAME="semiconductor-product-documents"
-  $env:SQL_CONNECTION_STRING="Driver={ODBC Driver 18 for SQL Server};Server=tcp:ai-db-poc.database.windows.net,1433;Database=ai-db-poc;Authentication=Active Directory Default;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+   $env:SQL_CONNECTION_STRING="Driver={ODBC Driver 18 for SQL Server};Server=tcp:<server>.privatelink.database.windows.net,1433;Database=<database>;Authentication=Active Directory Default;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
    $env:POLICY_MAX_OUTPUT_CHARS="12000"
    $env:POLICY_RATE_LIMIT_PER_MINUTE="60"
    ```
